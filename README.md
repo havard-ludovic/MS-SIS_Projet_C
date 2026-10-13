@@ -25,17 +25,29 @@ Construire l'image Docker
 docker build -t c-cracker-env .
 ```
 
-Lancer le conteneur en liant votre dossier courant
+lancez le conteneur
+sur linux
 ```
 docker run --rm -it -v $(pwd):/app c-cracker-env
 ```
 
+sur windows
+```
+docker run --rm -it -v ${PWD}:/app c-cracker-env
+```
+
+Dans la machine docker
 Compiler le code
 ```
 make
 ```
 
-lancer le programme
+Lancer le Mode G
 ```
-./cracker <hash_cible> <path/rockyou>
+./t3c G -i /opt/rockyou.txt -o table.t3c
+```
+
+Lancer le Mode L
+```
+
 ```

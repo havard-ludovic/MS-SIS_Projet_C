@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // Aiguillage selon le premier argument
+    // Aiguillage selon le premier argument (G ou L)
     if (strcmp(argv[1], "G") == 0) {
         return run_mode_g(argc, argv);
     } 
