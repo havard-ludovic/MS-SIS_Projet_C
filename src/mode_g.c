@@ -13,6 +13,22 @@ static void compute_md5(const unsigned char *data, size_t len, char output[33]) 
     output[32] = '\0';
 }
 
+// Fonction pour écrire la ligne de checksum à la fin du fichier table.t3c
+static void write_checksum_footer(FILE *outfile, MD5_CTX *ctx) {
+    unsigned char global_hash[MD5_DIGEST_LENGTH];
+    MD5_Final(global_hash, ctx);
+
+    // Conversion du hash binaire en chaîne hexadécimale de 32 caractères
+    char global_hash_str[33];
+    for (int i = 0; i < MD5_DIGEST_LENGTH; i++) {
+        sprintf(&global_hash_str[i * 2], "%02x", global_hash[i]);
+    }
+    global_hash_str[32] = '\0';
+
+    // Écriture de la signature à la fin du fichier
+    fprintf(outfile, "### CHECKSUM %s\n", global_hash_str);
+}
+
 int run_mode_g(int argc, char *argv[]) {
     char *input_path = NULL;
     char *output_path = NULL;
@@ -71,7 +87,7 @@ int run_mode_g(int argc, char *argv[]) {
     fseek(infile, 0, SEEK_END);
     long size = ftell(infile);
     if (size == 0) {
-        fprintf(stderr, "Erreur : Le fichier dictionnaire '%s' est vide.\n", input_path);
+        fprintf(stderr, "Erreur : Le fichier '%s' est vide.\n", input_path);
         fclose(infile);
         return 1;
     }
@@ -86,6 +102,10 @@ int run_mode_g(int argc, char *argv[]) {
         return 1;
     }
 
+    // Initialisation du contexte de checsum global
+    MD5_CTX global_ctx;
+    MD5_Init(&global_ctx);
+
     char *line = NULL; // Pointeur stockant la ligne lue par getline
     size_t len = 0; // Taille du buffer alloué pour la ligne
     ssize_t read_bytes; // Stocke le nombre de caractères effectivement lus par getline
@@ -93,7 +113,7 @@ int run_mode_g(int argc, char *argv[]) {
 
     // Lecture ligne par ligne en byte
     while ((read_bytes = getline(&line, &len, infile)) != -1) {
-        // Nettoyage des retours à la ligne (\n ou \r\n)
+        /*// Nettoyage des retours à la ligne (\n ou \r\n)
         if (read_bytes > 0 && (line[read_bytes - 1] == '\n' || line[read_bytes - 1] == '\r')) {
             line[read_bytes - 1] = '\0';
             read_bytes--;
@@ -101,19 +121,42 @@ int run_mode_g(int argc, char *argv[]) {
                 line[read_bytes - 1] = '\0';
                 read_bytes--;
             }
+        }*/
+        // Ignorer les lignes vides
+        if (read_bytes <= 1) continue;
+
+        // Nettoyage robuste des retours à la ligne de fin (\n et \r)
+        while (read_bytes > 0 && (line[read_bytes - 1] == '\n' || line[read_bytes - 1] == '\r')) {
+            line[read_bytes - 1] = '\0';
+            read_bytes--;
         }
+
+        // Si la ligne est vide après nettoyage, on passe à la suivante
+        if (read_bytes == 0) continue;
 
         // Calcul du hash MD5 de la ligne brute
         compute_md5((unsigned char *)line, read_bytes, hash_str);
 
+        // Préparation de la ligne formatée exacte qui sera écrite dans le fichier
+        char record[1024];
+        int record_len = snprintf(record, sizeof(record), "%s %s\n", hash_str, line);
+
+        // Mise à jours du checksum global
+        MD5_Update(&global_ctx, record, record_len);
+
         // Écriture du résultat dans la T3C au format : <hash> <mot>
-        fprintf(outfile, "%s %s\n", hash_str, line);
+        fputs(record, outfile);
     }
+
+    // Ecriture du footer de checksum à la fin du fichier
+    write_checksum_footer(outfile, &global_ctx);
 
     // Libération des ressources
     free(line);
     fclose(infile);
     fclose(outfile);
+
+    printf("Table T3C générée avec succès : %s\n", output_path);
 
     return 0;
 }

@@ -49,5 +49,14 @@ Lancer le Mode G
 
 Lancer le Mode L
 ```
+echo "f25a2fc72690b780b2a14e140ef6a9e0" | ./t3c L -t table.t3c
+```
 
+Lancer le Mode L avec plusieurs hash
+```
+/t3c L -t table.t3c <<EOF
+5f4dcc3b5aa765d61d8327deb882cf99
+e10adc3949ba59abbe56e057f20f883e
+hashinconnuinexistant123456789
+EOF
 ```
