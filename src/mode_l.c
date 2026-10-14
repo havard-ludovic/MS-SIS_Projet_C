@@ -1,8 +1,10 @@
 #include "mode_l.h"
 
+// https://man7.org/linux/man-pages/man3/isatty.3.html
+
 // Structure pour stocker une association hash -> mot en mémoire
 typedef struct {
-    char hash[33];
+    char hash[MD5_HEX_STRING_LEN+1];
     char *word;
 } Entry;
 
@@ -22,7 +24,7 @@ int verify_and_rewind_table(FILE *file) {
     MD5_CTX global_ctx;
     MD5_Init(&global_ctx);
 
-    char expected_checksum[33] = "";
+    char expected_checksum[MD5_HEX_STRING_LEN+1] = "";
     char *line = NULL;
     size_t len = 0;
     ssize_t read;
@@ -31,8 +33,8 @@ int verify_and_rewind_table(FILE *file) {
     while ((read = getline(&line, &len, file)) != -1) {
         if (strncmp(line, "### CHECKSUM ", 13) == 0) {
             // Extraction du checksum inscrit à la fin du fichier
-            memcpy(expected_checksum, line + 13, 32);
-            expected_checksum[32] = '\0';
+            memcpy(expected_checksum, line + 13, MD5_HEX_STRING_LEN);
+            expected_checksum[MD5_HEX_STRING_LEN] = '\0';
             continue; // On ne l'inclut pas dans le calcul mathématique du contenu
         }
         // Mise à jour de l'empreinte avec la ligne de données lue
@@ -51,11 +53,11 @@ int verify_and_rewind_table(FILE *file) {
     unsigned char computed_hash[MD5_DIGEST_LENGTH];
     MD5_Final(computed_hash, &global_ctx);
 
-    char computed_hash_str[33];
+    char computed_hash_str[MD5_HEX_STRING_LEN+1];
     for (int i = 0; i < MD5_DIGEST_LENGTH; i++) {
         sprintf(&computed_hash_str[i * 2], "%02x", computed_hash[i]);
     }
-    computed_hash_str[32] = '\0';
+    computed_hash_str[MD5_HEX_STRING_LEN] = '\0';
 
     // Comparaison stricte entre le calcul et la valeur enregistrée
     if (strcmp(computed_hash_str, expected_checksum) != 0) {
@@ -91,6 +93,12 @@ int run_mode_l(int argc, char *argv[]) {
     // Vérification de l'option obligatoire
     if (!table_path) {
         fprintf(stderr, "Erreur : L'option -t est obligatoire en mode L.\n");
+        return 1;
+    }
+    
+    // Si aucun flux n'est envoyé, on quitte
+    if (isatty(STDIN_FILENO)) {
+        fprintf(stderr, "Il n'y a pas de hash (utilisez un pipe)\n");
         return 1;
     }
 
@@ -135,7 +143,7 @@ int run_mode_l(int argc, char *argv[]) {
         }
 
         // Vérification minimale du format (<hash> <mot>)
-        if (read < 34 || line[32] != ' ') continue;
+        if (read < 34 || line[MD5_HEX_STRING_LEN] != ' ') continue;
 
         // Agrandissement dynamique du tableau si nécessaire
         if (count >= capacity) {
@@ -148,12 +156,12 @@ int run_mode_l(int argc, char *argv[]) {
             entries = temp;
         }
 
-        // Copie du hash (32 caractères)
-        memcpy(entries[count].hash, line, 32);
-        entries[count].hash[32] = '\0';
+        // Copie du hash
+        memcpy(entries[count].hash, line, MD5_HEX_STRING_LEN);
+        entries[count].hash[MD5_HEX_STRING_LEN] = '\0';
 
         // Copie du mot associé (situé après l'espace)
-        entries[count].word = strdup(line + 33);
+        entries[count].word = strdup(line + MD5_HEX_STRING_LEN+1);
 
         count++;
     }

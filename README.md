@@ -60,3 +60,9 @@ e10adc3949ba59abbe56e057f20f883e
 hashinconnuinexistant123456789
 EOF
 ```
+
+Lancer le Mode L avec un fichier
+```
+cat test.txt | ./t3c L -t table.t3c
+```
+

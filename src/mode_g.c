@@ -1,6 +1,8 @@
 #include "mode_g.h"
 
 // https://linux.die.net/man/3/getopt_long
+// https://docs.openssl.org/1.0.2/man3/md5/
+// https://fr.cppreference.com/c/io/fprintf
 
 // Fonction interne optimisée pour calculer le hash MD5
 static void compute_md5(const unsigned char *data, size_t len, char output[33]) {
@@ -19,11 +21,11 @@ static void write_checksum_footer(FILE *outfile, MD5_CTX *ctx) {
     MD5_Final(global_hash, ctx);
 
     // Conversion du hash binaire en chaîne hexadécimale de 32 caractères
-    char global_hash_str[33];
+    char global_hash_str[MD5_HEX_STRING_LEN+1];
     for (int i = 0; i < MD5_DIGEST_LENGTH; i++) {
         sprintf(&global_hash_str[i * 2], "%02x", global_hash[i]);
     }
-    global_hash_str[32] = '\0';
+    global_hash_str[MD5_HEX_STRING_LEN] = '\0';
 
     // Écriture de la signature à la fin du fichier
     fprintf(outfile, "### CHECKSUM %s\n", global_hash_str);
@@ -39,9 +41,8 @@ int run_mode_g(int argc, char *argv[]) {
     static struct option long_options[] = {
         {"input", required_argument, 0, 'i'},
         {"output", required_argument, 0, 'o'},
-        {"algo", required_argument, 0, 'a'},
-        {0, 0, 0, 0}
-    };
+        {"algo", optional_argument, 0, 'a'},
+        {0, 0, 0, 0}};
 
     optind = 2; // Ignore "./t3c" et "G"
     while ((opt = getopt_long(argc, argv, "i:o:a:", long_options, NULL)) != -1) {
@@ -109,7 +110,7 @@ int run_mode_g(int argc, char *argv[]) {
     char *line = NULL; // Pointeur stockant la ligne lue par getline
     size_t len = 0; // Taille du buffer alloué pour la ligne
     ssize_t read_bytes; // Stocke le nombre de caractères effectivement lus par getline
-    char hash_str[33]; // Tableau de caractères pour stocker le hash MD5 au format hexadécimal avec caractère /0 à la fin
+    char hash_str[MD5_HEX_STRING_LEN+1]; // Tableau de caractères pour stocker le hash MD5 au format hexadécimal avec caractère /0 à la fin
 
     // Lecture ligne par ligne en byte
     while ((read_bytes = getline(&line, &len, infile)) != -1) {
