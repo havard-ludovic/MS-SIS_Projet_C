@@ -113,15 +113,7 @@ int run_mode_g(int argc, char *argv[]) {
 
     // Lecture ligne par ligne en byte
     while ((read_bytes = getline(&line, &len, infile)) != -1) {
-        /*// Nettoyage des retours à la ligne (\n ou \r\n)
-        if (read_bytes > 0 && (line[read_bytes - 1] == '\n' || line[read_bytes - 1] == '\r')) {
-            line[read_bytes - 1] = '\0';
-            read_bytes--;
-            if (read_bytes > 0 && line[read_bytes - 1] == '\r') {
-                line[read_bytes - 1] = '\0';
-                read_bytes--;
-            }
-        }*/
+
         // Ignorer les lignes vides
         if (read_bytes <= 1) continue;
 
