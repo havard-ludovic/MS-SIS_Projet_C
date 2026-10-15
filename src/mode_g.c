@@ -1,29 +1,40 @@
 #include "mode_g.h"
 
 // https://linux.die.net/man/3/getopt_long
-// https://docs.openssl.org/1.0.2/man3/md5/
+// https://docs.openssl.org/3.2/man7/EVP_MD-MD5/
+// https://linux.die.net/man/3/evp_digestinit_ex
 // https://fr.cppreference.com/c/io/fprintf
 
 // Fonction interne optimisée pour calculer le hash MD5
 static void compute_md5(const unsigned char *data, size_t len, char output[33]) {
     unsigned char digest[MD5_DIGEST_LENGTH];
-    MD5(data, len, digest);
+    unsigned int digest_len = 0;
 
-    for (int i = 0; i < MD5_DIGEST_LENGTH; i++) {
+    EVP_MD_CTX *ctx = EVP_MD_CTX_new();
+    if (ctx) {
+        EVP_DigestInit_ex(ctx, EVP_md5(), NULL);
+        EVP_DigestUpdate(ctx, data, len);
+        EVP_DigestFinal_ex(ctx, digest, &digest_len);
+        EVP_MD_CTX_free(ctx);
+    }
+
+    for (unsigned int i = 0; i < digest_len; i++) {
         sprintf(&output[i * 2], "%02x", (unsigned int)digest[i]);
     }
     output[32] = '\0';
 }
 
 // Fonction pour écrire la ligne de checksum à la fin du fichier table.t3c
-static void write_checksum_footer(FILE *outfile, MD5_CTX *ctx) {
+static void write_checksum_footer(FILE *outfile, EVP_MD_CTX *ctx) {
     unsigned char global_hash[MD5_DIGEST_LENGTH];
-    MD5_Final(global_hash, ctx);
+    unsigned int global_hash_len = 0;
+    
+    EVP_DigestFinal_ex(ctx, global_hash, &global_hash_len);
 
     // Conversion du hash binaire en chaîne hexadécimale de 32 caractères
-    char global_hash_str[MD5_HEX_STRING_LEN+1];
-    for (int i = 0; i < MD5_DIGEST_LENGTH; i++) {
-        sprintf(&global_hash_str[i * 2], "%02x", global_hash[i]);
+    char global_hash_str[MD5_HEX_STRING_LEN + 1];
+    for (unsigned int i = 0; i < global_hash_len; i++) {
+        sprintf(&global_hash_str[i * 2], "%02x", (unsigned int)global_hash[i]);
     }
     global_hash_str[MD5_HEX_STRING_LEN] = '\0';
 
@@ -103,9 +114,15 @@ int run_mode_g(int argc, char *argv[]) {
         return 1;
     }
 
-    // Initialisation du contexte de checsum global
-    MD5_CTX global_ctx;
-    MD5_Init(&global_ctx);
+    // Initialisation du contexte de checksum global
+    EVP_MD_CTX *global_ctx = EVP_MD_CTX_new();
+    if (!global_ctx) {
+        fprintf(stderr, "Erreur : Échec d'allocation du contexte EVP global.\n");
+        fclose(infile);
+        fclose(outfile);
+        return 1;
+    }
+    EVP_DigestInit_ex(global_ctx, EVP_md5(), NULL);
 
     char *line = NULL; // Pointeur stockant la ligne lue par getline
     size_t len = 0; // Taille du buffer alloué pour la ligne
@@ -135,16 +152,17 @@ int run_mode_g(int argc, char *argv[]) {
         int record_len = snprintf(record, sizeof(record), "%s %s\n", hash_str, line);
 
         // Mise à jours du checksum global
-        MD5_Update(&global_ctx, record, record_len);
+        EVP_DigestUpdate(global_ctx, record, record_len);
 
         // Écriture du résultat dans la T3C au format : <hash> <mot>
         fputs(record, outfile);
     }
 
     // Ecriture du footer de checksum à la fin du fichier
-    write_checksum_footer(outfile, &global_ctx);
+    write_checksum_footer(outfile, global_ctx);
 
     // Libération des ressources
+    EVP_MD_CTX_free(global_ctx);
     free(line);
     fclose(infile);
     fclose(outfile);

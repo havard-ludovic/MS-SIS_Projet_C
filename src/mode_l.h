@@ -4,7 +4,7 @@
 #include <string.h>
 #include <getopt.h>
 #include <unistd.h>
-#include <openssl/md5.h>
+#include <openssl/evp.h>
 #include "const_md5.h"
 
 int run_mode_l(int,char*[]);

@@ -21,8 +21,12 @@ static int compare_search(const void *key, const void *element) {
 // Fonction qui vérifie le checksum global du fichier T3C
 // Retourne 1 si le fichier est intègre, 0 en cas de corruption ou d'altération.
 int verify_and_rewind_table(FILE *file) {
-    MD5_CTX global_ctx;
-    MD5_Init(&global_ctx);
+    EVP_MD_CTX *global_ctx = EVP_MD_CTX_new();
+    if (!global_ctx) {
+        fprintf(stderr, "Erreur : Échec d'allocation du contexte EVP global.\n");
+        return 0;
+    }
+    EVP_DigestInit_ex(global_ctx, EVP_md5(), NULL);
 
     char expected_checksum[MD5_HEX_STRING_LEN+1] = "";
     char *line = NULL;
@@ -38,7 +42,7 @@ int verify_and_rewind_table(FILE *file) {
             continue; // On ne l'inclut pas dans le calcul mathématique du contenu
         }
         // Mise à jour de l'empreinte avec la ligne de données lue
-        MD5_Update(&global_ctx, line, read);
+        EVP_DigestUpdate(global_ctx, line, read);
     }
 
     free(line);
@@ -46,12 +50,15 @@ int verify_and_rewind_table(FILE *file) {
     // Sécurité : si aucun checksum n'a été trouvé dans le fichier
     if (expected_checksum[0] == '\0') {
         fprintf(stderr, "Erreur : Fichier T3C invalide ou ancien format (aucun checksum trouvé).\n");
+        EVP_MD_CTX_free(global_ctx);
         return 0;
     }
 
     // Calcul final du checksum réel
     unsigned char computed_hash[MD5_DIGEST_LENGTH];
-    MD5_Final(computed_hash, &global_ctx);
+    unsigned int computed_hash_len = 0;
+    EVP_DigestFinal_ex(global_ctx, computed_hash, &computed_hash_len);
+    EVP_MD_CTX_free(global_ctx);
 
     char computed_hash_str[MD5_HEX_STRING_LEN+1];
     for (int i = 0; i < MD5_DIGEST_LENGTH; i++) {
